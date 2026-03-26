@@ -5,12 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>تطبيق Mony1 للربح</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="https://sad.adsgram.ai/js/adsgram-adbox.js"></script>
+    <script src="https://adsgram.ai/sdk/v1/adsgram.js"></script>
     <style>
-        body { font-family: sans-serif; background-color: #f4f7f6; text-align: center; padding: 20px; }
-        .card { background: white; border-radius: 20px; padding: 30px; shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 400px; margin: auto; }
-        .balance { font-size: 35px; color: #0088cc; font-weight: bold; margin: 20px 0; }
-        .btn { background: #28a745; color: white; border: none; padding: 15px; border-radius: 12px; width: 100%; font-size: 18px; font-weight: bold; cursor: pointer; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; text-align: center; padding: 20px; color: #333; }
+        .card { background: white; border-radius: 20px; padding: 30px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); max-width: 400px; margin: 40px auto; }
+        h2 { color: #0088cc; margin-bottom: 10px; }
+        .balance { font-size: 40px; color: #28a745; font-weight: bold; margin: 20px 0; border-bottom: 2px solid #eee; padding-bottom: 15px; }
+        .btn { background: linear-gradient(135deg, #28a745, #218838); color: white; border: none; padding: 18px; border-radius: 15px; width: 100%; font-size: 20px; font-weight: bold; cursor: pointer; transition: transform 0.2s; }
+        .btn:active { transform: scale(0.98); }
+        #status { margin-top: 20px; font-weight: bold; min-height: 24px; }
     </style>
 </head>
 <body>
@@ -18,34 +21,47 @@
         <h2>💰 رصيدك الحالي</h2>
         <div id="balance" class="balance">0.00 $</div>
         <button class="btn" onclick="showAd()">📺 شاهد إعلان واربح $0.02</button>
-        <p id="status" style="margin-top:15px; color: #666;"></p>
+        <p id="status"></p>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
-        tg.expand();
-        const userId = tg.initDataUnsafe.user.id;
+        tg.expand(); // توسيع الشاشة بالكامل
+        
+        // استخراج معرف المستخدم
+        const userId = tg.initDataUnsafe?.user?.id || "guest";
 
-        // --- اترك هذه الروابط كما هي الآن، سنعدلها بعد قليل ---
-        const SERVER_URL = "سيتم_وضعه_من_TERMUX"; 
-        const ADSGRAM_BLOCK_ID = "سيتم_وضعه_من_ADSGRAM";
+        // --- إعدادات الربط النهائية ---
+        // ملاحظة: استبدل SERVER_URL برابط الـ Localhost أو Ngrok الخاص بالترمكس لاحقاً
+        const SERVER_URL = "http://localhost:5000"; 
+        const ADSGRAM_BLOCK_ID = "25980"; // تم وضع الـ ID الخاص بك هنا
 
+        // تحديث الرصيد عند فتح التطبيق
         async function updateBalance() {
             try {
                 const res = await fetch(`${SERVER_URL}/get_user?id=${userId}`);
                 const data = await res.json();
                 document.getElementById('balance').innerText = data.balance.toFixed(2) + " $";
-            } catch (e) { console.log("في انتظار تشغيل الترمكس..."); }
+            } catch (e) { 
+                console.log("في انتظار ربط السيرفر بالترمكس..."); 
+                document.getElementById('status').style.color = "#666";
+                document.getElementById('status').innerText = "جاري الاتصال بالنظام...";
+            }
         }
         updateBalance();
 
+        // تهيئة وحدة الإعلانات
         const AdController = window.Adsgram.init({ blockId: ADSGRAM_BLOCK_ID });
 
         async function showAd() {
-            document.getElementById('status').innerText = "جاري التحميل...";
+            const statusDiv = document.getElementById('status');
+            statusDiv.style.color = "#0088cc";
+            statusDiv.innerText = "جاري تحميل الإعلان... ⏳";
+            
             try {
                 const result = await AdController.show();
                 if (result.done) {
+                    // إرسال طلب إضافة الرصيد للسيرفر في الترمكس
                     const res = await fetch(`${SERVER_URL}/add_balance`, {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
@@ -53,10 +69,14 @@
                     });
                     const data = await res.json();
                     document.getElementById('balance').innerText = data.new_balance.toFixed(2) + " $";
-                    document.getElementById('status').innerText = "مبروك! تمت إضافة الربح ✅";
+                    statusDiv.style.color = "#28a745";
+                    statusDiv.innerText = "مبروك! تمت إضافة الربح ✅";
                 }
-            } catch (e) { document.getElementById('status').innerText = "تم إغلاق الإعلان"; }
+            } catch (e) { 
+                statusDiv.style.color = "#dc3545";
+                statusDiv.innerText = "لم تكتمل المشاهدة أو لا توجد إعلانات حالياً."; 
+            }
         }
     </script>
 </body>
-  </html>
+</html>
