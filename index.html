@@ -13,7 +13,7 @@
         .balance { font-size: 40px; color: #28a745; font-weight: bold; margin: 20px 0; border-bottom: 2px solid #eee; padding-bottom: 15px; }
         .btn { background: linear-gradient(135deg, #28a745, #218838); color: white; border: none; padding: 18px; border-radius: 15px; width: 100%; font-size: 20px; font-weight: bold; cursor: pointer; transition: transform 0.2s; }
         .btn:active { transform: scale(0.98); }
-        #status { margin-top: 20px; font-weight: bold; min-height: 24px; }
+        #status { margin-top: 20px; font-weight: bold; min-height: 24px; font-size: 14px; }
     </style>
 </head>
 <body>
@@ -26,55 +26,72 @@
 
     <script>
         const tg = window.Telegram.WebApp;
-        tg.expand(); // توسيع الشاشة بالكامل
+        tg.expand(); 
         
-        // استخراج معرف المستخدم
         const userId = tg.initDataUnsafe?.user?.id || "guest";
 
-        // --- إعدادات الربط النهائية ---
-        // ملاحظة: استبدل SERVER_URL برابط الـ Localhost أو Ngrok الخاص بالترمكس لاحقاً
+        // --- الإعدادات النهائية (تأكد من بقاء Serveo يعمل في الترمكس) ---
         const SERVER_URL = "https://e60fb163f66fcf6e-135-125-175-209.serveousercontent.com"; 
-        const ADSGRAM_BLOCK_ID = "25980"; // تم وضع الـ ID الخاص بك هنا
+        const ADSGRAM_BLOCK_ID = "25980"; 
 
-        // تحديث الرصيد عند فتح التطبيق
+        // تحديث الرصيد عند فتح التطبيق من الترمكس
         async function updateBalance() {
             try {
                 const res = await fetch(`${SERVER_URL}/get_user?id=${userId}`);
                 const data = await res.json();
                 document.getElementById('balance').innerText = data.balance.toFixed(2) + " $";
+                document.getElementById('status').innerText = ""; 
             } catch (e) { 
-                console.log("في انتظار ربط السيرفر بالترمكس..."); 
                 document.getElementById('status').style.color = "#666";
-                document.getElementById('status').innerText = "جاري الاتصال بالنظام...";
+                document.getElementById('status').innerText = "جاري الاتصال بسيرفر الترمكس... تأكد من تشغيل Serveo";
             }
         }
         updateBalance();
 
-        // تهيئة وحدة الإعلانات
-        const AdController = window.Adsgram.init({ blockId: ADSGRAM_BLOCK_ID });
+        // تهيئة وحدة الإعلانات مع وضع التصحيح
+        const AdController = window.Adsgram.init({ 
+            blockId: ADSGRAM_BLOCK_ID,
+            debug: true 
+        });
 
         async function showAd() {
             const statusDiv = document.getElementById('status');
             statusDiv.style.color = "#0088cc";
-            statusDiv.innerText = "جاري تحميل الإعلان... ⏳";
+            statusDiv.innerText = "جاري طلب إعلان من Adsgram... ⏳";
             
             try {
                 const result = await AdController.show();
                 if (result.done) {
-                    // إرسال طلب إضافة الرصيد للسيرفر في الترمكس
+                    statusDiv.innerText = "تمت المشاهدة! جاري إضافة الرصيد... ⚙️";
+                    
+                    // إرسال الأرباح إلى ملف البايثون في الترمكس
                     const res = await fetch(`${SERVER_URL}/add_balance`, {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({ id: userId, amount: 0.02 })
                     });
-                    const data = await res.json();
-                    document.getElementById('balance').innerText = data.new_balance.toFixed(2) + " $";
-                    statusDiv.style.color = "#28a745";
-                    statusDiv.innerText = "مبروك! تمت إضافة الربح ✅";
+                    
+                    if (res.ok) {
+                        const data = await res.json();
+                        document.getElementById('balance').innerText = data.new_balance.toFixed(2) + " $";
+                        statusDiv.style.color = "#28a745";
+                        statusDiv.innerText = "مبروك! تمت إضافة الربح بنجاح ✅";
+                    } else {
+                        throw new Error("فشل في تحديث الرصيد بالسيرفر");
+                    }
                 }
             } catch (e) { 
+                console.error("Adsgram Error Detail:", e);
                 statusDiv.style.color = "#dc3545";
-                statusDiv.innerText = "لم تكتمل المشاهدة أو لا توجد إعلانات حالياً."; 
+                
+                // رسائل خطأ مفصلة
+                if (e.description === "No ads") {
+                    statusDiv.innerText = "لا توجد إعلانات متوفرة الآن (حاول تغيير دولة الـ VPN)";
+                } else if (e.description === "Block not found") {
+                    statusDiv.innerText = "خطأ: رقم الـ Block ID غير صحيح أو لم يفعل بعد";
+                } else {
+                    statusDiv.innerText = "حدث خطأ: " + (e.description || "تأكد من اتصال الإنترنت");
+                }
             }
         }
     </script>
